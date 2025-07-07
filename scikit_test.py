@@ -13,7 +13,7 @@ from skimage import (exposure, feature, filters, io, measure,
                      util)
 
 
-file = io.imread("/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_2/003.tif")
+file = io.imread("/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_2/002.tif")
 
 viewer = napari.view_image(file, visible=False)
 
@@ -61,6 +61,7 @@ def close(x):
 def count_lobes(file, count): # doesn't take into account anything w/ an area limit
     eroded_file = morphology.binary_erosion(file,footprint=np.ones(shape=(3,12,12))) # change footprint to correspond to resolution?
     labels,labelcount = measure.label(eroded_file,connectivity=1,return_num=True)
+    # print("labels {}, labelcount {}".format(labels, labelcount))
     if labelcount>0:
         current_lobe_count=0
         for i in range(1,labelcount+1):
@@ -97,6 +98,8 @@ arr = morphology.remove_small_objects(hole_fill,min_size=500,connectivity=1)
 count = -1
 total_lobe_count = count_lobes(arr,0)
 print(total_lobe_count)
+
+napari.run()
 
 # beginning of image processing section
 '''
@@ -357,8 +360,8 @@ for i in range(hull.vertices.size):
 '''
 
 
-plt.tight_layout()
-plt.show()
+# plt.tight_layout()
+# plt.show()
 
 
 

@@ -30,7 +30,7 @@ shape = file.shape
 
 
 
-directory_path = Path('/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Test')
+directory_path = Path('/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_2')
 all_files = list(directory_path.glob('*'))
 
 # for path in all_files:
@@ -145,7 +145,8 @@ for path in all_files:
         print(f"lobe count: {len(np.unique(newpeaks))}")
 
     # print(properties)
-    # print(newproperties)
+    print(newproperties)
+    print(properties["prominences"].max())
     plt.plot(uniquetheta[newpeaks],newresult[newpeaks],'x')
 
     # plt.scatter(distance[0],distance[2],alpha=0.2)
