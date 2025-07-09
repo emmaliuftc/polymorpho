@@ -11,9 +11,9 @@ from scipy import ndimage as ndi
 from skimage import (exposure, feature, filters, io, measure,
                      morphology, restoration, segmentation, transform,
                      util)
+from pathlib import Path
 
-
-file = io.imread("/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_2/002.tif")
+file = io.imread("/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_3/041.tif")
 
 viewer = napari.view_image(file, visible=False)
 
@@ -91,13 +91,21 @@ def count_lobes(file, count): # doesn't take into account anything w/ an area li
 # filtered_hole_areas = hole_areas[hole_areas>200]
 # print(f"final hole count: {filtered_hole_areas.size}")
 
+directory_path = Path('/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_3')
+all_files = list(directory_path.glob('*'))
 
-hole_fill = fill(file)
-viewer.add_image(hole_fill)
-arr = morphology.remove_small_objects(hole_fill,min_size=500,connectivity=1)
-count = -1
-total_lobe_count = count_lobes(arr,0)
-print(total_lobe_count)
+lobe_counts = []
+for path in all_files:
+    ogfile = io.imread(path)
+    print(path)
+    hole_fill = fill(ogfile)
+    viewer.add_image(hole_fill)
+    arr = morphology.remove_small_objects(hole_fill,min_size=500,connectivity=1)
+    count = -1
+    total_lobe_count = count_lobes(arr,0)
+    print(total_lobe_count)
+    lobe_counts = np.append(lobe_counts,total_lobe_count)
+
 
 napari.run()
 
