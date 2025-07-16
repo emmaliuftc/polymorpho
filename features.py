@@ -14,7 +14,8 @@ from skimage import (exposure, feature, filters, io, measure,
 from pathlib import Path
 import math
 import pywt
-from sklearn import svm,preprocessing,cluster,decomposition
+from sklearn import svm,preprocessing,cluster,decomposition,metrics
+from mahotas import features
 
 def fill(x):
     newfile = np.zeros_like(x)
@@ -22,7 +23,7 @@ def fill(x):
         roi = x[i,:,:]
         new = morphology.remove_small_holes(roi, area_threshold=4000)
         newfile[i,:,:] = new
-    newfile = morphology.remove_small_holes(newfile,area_threshold=6000)
+    newfile = morphology.remove_small_holes(newfile,area_threshold=9000)
     return newfile
 
 file = io.imread("/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_3/033.tif")
@@ -37,21 +38,27 @@ for path in dir:
     all_files = np.append(all_files,str(path))
 
 all_files = sorted(all_files)
+
+directory2_path = Path('/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing')
+dir2 = [f.path for f in os.scandir(directory2_path) if f.is_file()]
+all_files2 = []
+for path in dir2:
+    all_files2 = np.append(all_files2,str(path))
+
+all_files2 = sorted(all_files2)
+
 # print(all_files)
 
 # shape = (number of images,number of features)
-# (20, 3)
-# volume, surface area, sphericity
-
 data_size = len(all_files)
-
-# x_train = np.empty(shape=(10,4))
-x_train = np.empty(shape=(data_size,4))
+feature_num = 17
+x_train = np.empty(shape=(data_size,feature_num))
 
 # images = np.array((1,1))
 volumes = []
 surfaces = []
 sphericities = []
+haralicks = []
 
 for i in range(len(all_files)):
     ogfile = io.imread(all_files[i])
@@ -61,24 +68,36 @@ for i in range(len(all_files)):
     # images = np.append(images,hole_fill)
 
     labels = measure.label(hole_fill)
-    properties = measure.regionprops_table(labels,properties=("area",))
+    # properties = measure.regionprops_table(labels,properties=("area","axis_major_length","axis_minor_length"))
     volume = np.count_nonzero(hole_fill)
-
-    print(f"volume: {volume}")
+    # maj = properties["axis_major_length"]
+    # mino = properties["axis_minor_length"]
+    # print(f"volume: {volume}")
     volumes.append(volume)
 
-    print(properties)
+
+
+
+    haralicks.append(features.haralick(hole_fill,return_mean=True))
+    # print(f"binary iamge: {features.haralick(hole_fill,return_mean=True)}")
+    
+    # viewer.add_image(features.haralick(hole_fill),name=f"haralick {all_files[i]}",visible=False)
+    # file = io.imread(all_files2[i])
+    # print(all_files2[i])
+    # haralick = features.haralick(file,return_mean=True)
+    # haralicks.append(haralick)
+    # print(f"binary iamge: {haralicks[i]}")
 
     verts,faces,normals,values = measure.marching_cubes(hole_fill,step_size=3)
 
     surface_area = measure.mesh_surface_area(verts,faces)
 
-    print(f"surface area: {surface_area}")
+    # print(f"surface area: {surface_area}")
     surfaces.append(surface_area)
 
     sphericity = pow(math.pi, 0.3333)*pow(6*volume,0.666666)/surface_area
 
-    print(sphericity)
+    # print(sphericity)
     sphericities.append(sphericity)
 '''
     for i in range(10):
@@ -106,13 +125,16 @@ for i in range(len(all_files)):
     # viewer.add_image(cD)
 
 # real_counts = np.array([2,3,4,2,4,2,1,3,3,3])
-real_counts = [2,3,4,2,4,3,1,3,2,3,3,2,1,2,3,2,1,3,3,3]
-
+real_counts = [2,2,4,4,4,4,2,1,3,4,2,1,4,1,3,4,2,3,4,2,4,3,1,3,2,3,3,2,1,2,3,2,1,3,3,3]
 
 npvolumes = np.array(volumes)
 npsurfaces = np.array(surfaces)
 npsphericities = np.array(sphericities)
-print(volumes)
+npharalicks = np.array(haralicks)
+
+print(npharalicks.shape)
+print(npvolumes.shape)
+
 
 # x_train[:,0] = np.reshape(volumes,newshape=(10,1))[:,0]
 # x_train[:,1] = np.reshape(surfaces,newshape=(10,1))[:,0]
@@ -122,6 +144,12 @@ x_train[:,0] = np.reshape(volumes,newshape=(data_size,1))[:,0]
 x_train[:,1] = np.reshape(surfaces,newshape=(data_size,1))[:,0]
 x_train[:,2] = np.reshape(sphericities,newshape=(data_size,1))[:,0]
 x_train[:,3] = np.reshape(real_counts,newshape=(data_size,1))[:,0]
+x_train[:,4:17] = npharalicks
+
+
+
+
+
 
 
 # print(x_train)
@@ -130,28 +158,157 @@ x_train_norm = preprocessing.normalize(x_train)
 
 scaler = preprocessing.StandardScaler()
 x_train_scaled = scaler.fit_transform(x_train)
+# print(x_train)
+# print(x_train_scaled)
+
 # need x_test eventually
 # scaler.transform(x_test)
 
-pca = decomposition.PCA(n_components=2)
+# pca = decomposition.PCA(n_components=2)
+pca = decomposition.PCA(n_components=2,whiten=True)
 x_pca = pca.fit_transform(x_train_scaled)
 
-print("Explained variance ratio:", pca.explained_variance_ratio_)
-print("Cumulative explained variance:", pca.explained_variance_ratio_.sum())
+print(x_pca)
 
-kmeans = cluster.KMeans(n_clusters=5,random_state=0,n_init="auto")
+explained_variances = pca.explained_variance_ratio_
+
+print(f"explained variance ratio: {explained_variances}")
+print(f"cumulative explained variance: {pca.explained_variance_ratio_.sum()}")
+
+fig1 = plt.figure()
+ax1 = fig1.add_subplot(1,1,1)
+ax1.bar(range(1,len(explained_variances)+1),explained_variances)
+ax1.set_xlabel("principal components")
+ax1.set_ylabel("% explained variance")
+
+
+
+kmeans = cluster.KMeans(n_clusters=6,random_state=0)
 
 kmeans.fit(x_pca)
 
 labels = kmeans.labels_
 centers = kmeans.cluster_centers_
 
-plt.scatter(x_pca[:, 0], x_pca[:, 1], c=labels, cmap='viridis')
-plt.scatter(centers[:, 0], centers[:, 1], color='red', marker='x')
-plt.xlabel('pca1')
-plt.ylabel('pca2')
-for i, (x, y_val) in enumerate(x_pca):
-    plt.annotate(str(i+32), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-plt.show()
+# fig2 = plt.figure()
+# ax2 = fig2.add_subplot(1,1,1)
+# ax2.scatter(x_pca[:, 0], x_pca[:, 1], c=labels, cmap='viridis')
+# ax2.scatter(centers[:, 0], centers[:, 1], color='red', marker='x')
+# ax2.set_xlabel('pc1')
+# ax2.set_ylabel('pc2')
+# for i, (x, y_val) in enumerate(x_pca):
+#     if 0<=i<=4:
+#         ax2.annotate(str(i+1), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+#     elif 5<=i<=9:
+#         ax2.annotate(str(i+3), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+#     elif 10<=i<=15:
+#         ax2.annotate(str(i+4), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+#     elif 16<=i:
+#         ax2.annotate(str(i+16), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+# plt.show()
 
-# napari.run()
+# range_n_clusters = [2, 3, 4, 5, 6,7,8,9,10]
+
+# for n_clusters in range_n_clusters:
+#     # Create a subplot with 1 row and 2 columns
+#     fig, (ax1, ax2) = plt.subplots(1, 2)
+#     fig.set_size_inches(18, 7)
+
+#     # The 1st subplot is the silhouette plot
+#     # The silhouette coefficient can range from -1, 1 but in this example all
+#     # lie within [-0.1, 1]
+#     ax1.set_xlim([-0.1, 1])
+#     # The (n_clusters+1)*10 is for inserting blank space between silhouette
+#     # plots of individual clusters, to demarcate them clearly.
+#     ax1.set_ylim([0, len(x_pca) + (n_clusters + 1) * 10])
+
+#     # Initialize the clusterer with n_clusters value and a random generator
+#     # seed of 10 for reproducibility.
+#     clusterer = cluster.KMeans(n_clusters=n_clusters, random_state=0,n_init="auto")
+#     cluster_labels = clusterer.fit_predict(x_pca)
+
+#     # The silhouette_score gives the average value for all the samples.
+#     # This gives a perspective into the density and separation of the formed
+#     # clusters
+#     silhouette_avg = metrics.silhouette_score(x_pca, cluster_labels)
+#     print(
+#         "For n_clusters =",
+#         n_clusters,
+#         "The average silhouette_score is :",
+#         silhouette_avg,
+#     )
+
+#     # Compute the silhouette scores for each sample
+#     sample_silhouette_values = metrics.silhouette_samples(x_pca, cluster_labels)
+
+#     y_lower = 10
+#     for i in range(n_clusters):
+#         # Aggregate the silhouette scores for samples belonging to
+#         # cluster i, and sort them
+#         ith_cluster_silhouette_values = sample_silhouette_values[cluster_labels == i]
+
+#         ith_cluster_silhouette_values.sort()
+
+#         size_cluster_i = ith_cluster_silhouette_values.shape[0]
+#         y_upper = y_lower + size_cluster_i
+
+#         color = plt.cm.nipy_spectral(float(i) / n_clusters)
+#         ax1.fill_betweenx(
+#             np.arange(y_lower, y_upper),
+#             0,
+#             ith_cluster_silhouette_values,
+#             facecolor=color,
+#             edgecolor=color,
+#             alpha=0.7,
+#         )
+
+#         # Label the silhouette plots with their cluster numbers at the middle
+#         ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
+
+#         # Compute the new y_lower for next plot
+#         y_lower = y_upper + 10  # 10 for the 0 samples
+
+#     ax1.set_title("The silhouette plot for the various clusters.")
+#     ax1.set_xlabel("The silhouette coefficient values")
+#     ax1.set_ylabel("Cluster label")
+
+#     # The vertical line for average silhouette score of all the values
+#     ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
+
+#     ax1.set_yticks([])  # Clear the yaxis labels / ticks
+#     ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
+
+#     # 2nd Plot showing the actual clusters formed
+#     colors = plt.cm.nipy_spectral(cluster_labels.astype(float) / n_clusters)
+#     ax2.scatter(
+#         x_pca[:, 0], x_pca[:, 1], marker=".", s=30, lw=0, alpha=0.7, c=colors, edgecolor="k"
+#     )
+
+#     # Labeling the clusters
+#     centers = clusterer.cluster_centers_
+#     # Draw white circles at cluster centers
+#     ax2.scatter(
+#         centers[:, 0],
+#         centers[:, 1],
+#         marker="o",
+#         c="white",
+#         alpha=1,
+#         s=200,
+#         edgecolor="k",
+#     )
+
+#     for i, c in enumerate(centers):
+#         ax2.scatter(c[0], c[1], marker="$%d$" % i, alpha=1, s=50, edgecolor="k")
+
+#     ax2.set_title("The visualization of the clustered data.")
+#     ax2.set_xlabel("Feature space for the 1st feature")
+#     ax2.set_ylabel("Feature space for the 2nd feature")
+
+#     plt.suptitle(
+#         "Silhouette analysis for KMeans clustering on sample data with n_clusters = %d"
+#         % n_clusters,
+#         fontsize=14,
+#         fontweight="bold",
+#     )
+
+# plt.show()
