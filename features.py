@@ -14,8 +14,11 @@ from skimage import (exposure, feature, filters, io, measure,
 from pathlib import Path
 import math
 import pywt
-from sklearn import svm,preprocessing,cluster,decomposition,metrics
+from sklearn import svm,preprocessing,cluster,decomposition,metrics,manifold
 from mahotas import features
+import seaborn as sns
+import umap
+
 
 def fill(x):
     newfile = np.zeros_like(x)
@@ -183,6 +186,8 @@ ax1.set_ylabel("% explained variance")
 
 
 
+
+
 kmeans = cluster.KMeans(n_clusters=6,random_state=0)
 
 kmeans.fit(x_pca)
@@ -190,22 +195,93 @@ kmeans.fit(x_pca)
 labels = kmeans.labels_
 centers = kmeans.cluster_centers_
 
-# fig2 = plt.figure()
-# ax2 = fig2.add_subplot(1,1,1)
-# ax2.scatter(x_pca[:, 0], x_pca[:, 1], c=labels, cmap='viridis')
-# ax2.scatter(centers[:, 0], centers[:, 1], color='red', marker='x')
-# ax2.set_xlabel('pc1')
-# ax2.set_ylabel('pc2')
-# for i, (x, y_val) in enumerate(x_pca):
-#     if 0<=i<=4:
-#         ax2.annotate(str(i+1), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-#     elif 5<=i<=9:
-#         ax2.annotate(str(i+3), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-#     elif 10<=i<=15:
-#         ax2.annotate(str(i+4), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-#     elif 16<=i:
-#         ax2.annotate(str(i+16), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-# plt.show()
+fig2, (ax2,ax3,ax4,ax5) = plt.subplots(1,4)
+ax2.scatter(x_pca[:, 0], x_pca[:, 1], c=labels, cmap='viridis')
+ax2.scatter(centers[:, 0], centers[:, 1], color='red', marker='x')
+ax2.set_xlabel('pc1')
+ax2.set_ylabel('pc2')
+ax2.set_title("K-means after PCA")
+for i, (x, y_val) in enumerate(x_pca):
+    if 0<=i<=4:
+        ax2.annotate(str(i+1), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 5<=i<=9:
+        ax2.annotate(str(i+3), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 10<=i<=15:
+        ax2.annotate(str(i+4), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 16<=i:
+        ax2.annotate(str(i+16), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+
+hdbscan = cluster.HDBSCAN(min_cluster_size=2)
+hdbscan.fit(x_pca)
+
+labels2 = hdbscan.labels_
+# centers2 = hdbscan.centroids_
+print(labels2)
+
+ax5.scatter(x_pca[:, 0], x_pca[:, 1], c=labels2, cmap='viridis')
+# ax5.scatter(centers2[:, 0], centers2[:, 1], color='red', marker='x')
+ax5.set_xlabel('pc1')
+ax5.set_ylabel('pc2')
+ax5.set_title('HDBSCAN after PCA')
+for i, (x, y_val) in enumerate(x_pca):
+    if 0<=i<=4:
+        ax5.annotate(str(i+1), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 5<=i<=9:
+        ax5.annotate(str(i+3), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 10<=i<=15:
+        ax5.annotate(str(i+4), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 16<=i:
+        ax5.annotate(str(i+16), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+
+
+
+
+tsne = manifold.TSNE(2,random_state=0)
+tsne_result = tsne.fit_transform(x_train_scaled)
+print(tsne_result.shape)
+
+print(f"tsne effective learnign rate: {tsne.learning_rate_}")
+
+kmeans1 = cluster.KMeans(n_clusters=6,random_state=0)
+kmeans1.fit(tsne_result)
+labels1 = kmeans1.labels_
+centers1 = kmeans1.cluster_centers_
+
+ax3.scatter(tsne_result[:, 0], tsne_result[:, 1])
+ax3.set_xlabel('tsne1')
+ax3.set_ylabel('tsne2')
+ax3.set_title("t-SNE embedding")
+for i, (x, y_val) in enumerate(tsne_result):
+    if 0<=i<=4:
+        ax3.annotate(str(i+1), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 5<=i<=9:
+        ax3.annotate(str(i+3), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 10<=i<=15:
+        ax3.annotate(str(i+4), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 16<=i:
+        ax3.annotate(str(i+16), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+
+umap = umap.UMAP(random_state=0)
+umap_result = umap.fit_transform(x_train_scaled)
+
+print(umap_result.shape)
+ax4.scatter(umap_result[:, 0], umap_result[:, 1])
+ax4.set_xlabel('umap1')
+ax4.set_ylabel('umap2')
+ax4.set_title("UMAP embedding")
+for i, (x, y_val) in enumerate(umap_result):
+    if 0<=i<=4:
+        ax4.annotate(str(i+1), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 5<=i<=9:
+        ax4.annotate(str(i+3), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 10<=i<=15:
+        ax4.annotate(str(i+4), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    elif 16<=i:
+        ax4.annotate(str(i+16), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+
+
+
+plt.show()
 
 # range_n_clusters = [2, 3, 4, 5, 6,7,8,9,10]
 
