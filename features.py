@@ -1,23 +1,23 @@
 import os
 import napari
 from scipy import stats, signal
-from scipy.spatial import ConvexHull, convex_hull_plot_2d
+# from scipy.spatial import ConvexHull, convex_hull_plot_2d
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
-from matplotlib import pyplot as plt
-from scipy import ndimage as ndi
+from matplotlib import pyplot as plt, colors, cm
+# from scipy import ndimage as ndi
 from skimage import (exposure, feature, filters, io, measure,
                      morphology, restoration, segmentation, transform,
                      util)
 from pathlib import Path
 import math
-import pywt
+# import pywt
 from sklearn import svm,preprocessing,cluster,decomposition,metrics,manifold
 from mahotas import features
-import seaborn as sns
-import umap
+# import seaborn as sns
+# import umap
 
 
 def fill(x):
@@ -26,7 +26,7 @@ def fill(x):
         roi = x[i,:,:]
         new = morphology.remove_small_holes(roi, area_threshold=4000)
         newfile[i,:,:] = new
-    newfile = morphology.remove_small_holes(newfile,area_threshold=9000)
+    newfile = morphology.remove_small_holes(newfile,area_threshold=100000)
     return newfile
 
 file = io.imread("/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_3/033.tif")
@@ -62,9 +62,14 @@ volumes = []
 surfaces = []
 sphericities = []
 haralicks = []
+filenames = []
 
 for i in range(len(all_files)):
+    fileindex = str(all_files[i][-6]+all_files[i][-5])
+    filenames.append(fileindex)
     ogfile = io.imread(all_files[i])
+
+    print(ogfile.shape)
     print(all_files[i])
     hole_fill = fill(ogfile)
     viewer.add_image(hole_fill,name=f"{all_files[i]}",visible=False)
@@ -78,6 +83,7 @@ for i in range(len(all_files)):
     # print(f"volume: {volume}")
     volumes.append(volume)
 
+    slice = hole_fill[10,:,:]
 
 
 
@@ -109,8 +115,6 @@ for i in range(len(all_files)):
         boundary = segmentation.find_boundaries(gauss)
         viewer.add_image(boundary)
 '''
-
-
     # wp = pywt.WaveletPacketND(hole_fill,wavelet='db2')
     # # x=np.array([1,2,3,4,5,6,7,8])
     # # wp = pywt.WaveletPacketND(data=x,wavelet='db1')
@@ -120,7 +124,6 @@ for i in range(len(all_files)):
     # # print(wp.maxlevel)
     # # print(wp['aaa'].data)
 
-
     # cA, cD = pywt.dwt(hole_fill,'db2')
     # print(cA)
     # print(cD)
@@ -128,7 +131,7 @@ for i in range(len(all_files)):
     # viewer.add_image(cD)
 
 # real_counts = np.array([2,3,4,2,4,2,1,3,3,3])
-real_counts = [2,2,4,4,4,4,2,1,3,4,2,1,4,1,3,4,2,3,4,2,4,3,1,3,2,3,3,2,1,2,3,2,1,3,3,3]
+real_counts = [2,2,4,4,4,4,2,1,3,4,2,1,4,1,3,4,3,4,3,3,3,3,3,2,3,2,2,3,4,2,4,3,1,3,2,3,3,2,1,2,3,2,1,3,3,3]
 
 npvolumes = np.array(volumes)
 npsurfaces = np.array(surfaces)
@@ -138,11 +141,13 @@ npharalicks = np.array(haralicks)
 print(npharalicks.shape)
 print(npvolumes.shape)
 
+# # x_train[:,0] = np.reshape(volumes,newshape=(data_size,1))[:,0]
+# # x_train[:,0] = np.reshape(surfaces,newshape=(data_size,1))[:,0]
+# x_train[:,0] = np.reshape(sphericities,newshape=(data_size,1))[:,0]
+# x_train[:,1] = np.reshape(real_counts,newshape=(data_size,1))[:,0]
+# x_train[:,2:15] = npharalicks
 
-# x_train[:,0] = np.reshape(volumes,newshape=(10,1))[:,0]
-# x_train[:,1] = np.reshape(surfaces,newshape=(10,1))[:,0]
-# x_train[:,2] = np.reshape(sphericities,newshape=(10,1))[:,0]
-# x_train[:,3] = np.reshape(real_counts,newshape=(10,1))[:,0]
+
 x_train[:,0] = np.reshape(volumes,newshape=(data_size,1))[:,0]
 x_train[:,1] = np.reshape(surfaces,newshape=(data_size,1))[:,0]
 x_train[:,2] = np.reshape(sphericities,newshape=(data_size,1))[:,0]
@@ -171,7 +176,17 @@ x_train_scaled = scaler.fit_transform(x_train)
 pca = decomposition.PCA(n_components=2,whiten=True)
 x_pca = pca.fit_transform(x_train_scaled)
 
-print(x_pca)
+# print(x_pca)
+
+components = pca.components_
+print(components)
+
+fig = plt.figure()
+ax = fig.add_subplot()
+ax.scatter(components[0],components[1])
+for i in range(feature_num):
+    ax.annotate(i, (components[0][i],components[1][i]), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+s = [ax.quiver(0,0,components[0][i], components[1][i],angles='xy', scale_units='xy',scale=1) for i in range(feature_num)]
 
 explained_variances = pca.explained_variance_ratio_
 
@@ -188,28 +203,68 @@ ax1.set_ylabel("% explained variance")
 
 
 
-kmeans = cluster.KMeans(n_clusters=6,random_state=0)
-
+# kmeans = cluster.KMeans(n_clusters=6,random_state=0)
+kmeans = cluster.KMeans(n_clusters=6,random_state=0,init="random",n_init=40)
 kmeans.fit(x_pca)
-
 labels = kmeans.labels_
 centers = kmeans.cluster_centers_
 
-fig2, (ax2,ax3,ax4,ax5) = plt.subplots(1,4)
+#fig2, (ax7,ax2,ax3,ax4,ax5,ax6) = plt.subplots(1,6)
+fig2, (ax7,ax2,ax5,ax6) = plt.subplots(1,4)
+
 ax2.scatter(x_pca[:, 0], x_pca[:, 1], c=labels, cmap='viridis')
 ax2.scatter(centers[:, 0], centers[:, 1], color='red', marker='x')
 ax2.set_xlabel('pc1')
 ax2.set_ylabel('pc2')
-ax2.set_title("K-means after PCA")
+ax2.set_title("K-means after PCA with random init n=40")
 for i, (x, y_val) in enumerate(x_pca):
-    if 0<=i<=4:
-        ax2.annotate(str(i+1), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 5<=i<=9:
-        ax2.annotate(str(i+3), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 10<=i<=15:
-        ax2.annotate(str(i+4), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 16<=i:
-        ax2.annotate(str(i+16), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    ax2.annotate(filenames[i], (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+
+ax6.scatter(x_pca[:, 0], x_pca[:, 1],c=real_counts,cmap='viridis')
+ax6.legend()
+
+kmeans1 = cluster.KMeans(n_clusters=6,random_state=0)
+kmeans1.fit(x_pca)
+labels1 = kmeans1.labels_
+centers1 = kmeans1.cluster_centers_
+ax7.scatter(x_pca[:, 0], x_pca[:, 1], c=labels1, cmap='viridis')
+ax7.scatter(centers1[:, 0], centers1[:, 1], color='red', marker='x')
+ax7.set_xlabel('pc1')
+ax7.set_ylabel('pc2')
+ax7.set_title("K-means after PCA kmeans++ init n=1")
+for i, (x, y_val) in enumerate(x_pca):
+    ax7.annotate(filenames[i], (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+
+
+pearsons = np.empty(shape=(feature_num,feature_num))
+for i in range(feature_num):
+    for j in range(feature_num):
+        if i>j:
+            pearsons[i,j]=0
+        else:
+            pearsons[i,j]=round(stats.pearsonr(x_train[:,i],x_train[:,j]).statistic,3)
+
+cmap = cm.PiYG
+norm = colors.Normalize(vmin=-1,vmax=1)
+colors = cmap(norm(pearsons))
+
+cell_text = [[str(item) for item in row] for row in pearsons]
+
+# colors = [['g' if (cell > 0.8) else ('r' if (cell<-0.8) else 'w') for cell in row] for row in pearsons]
+
+
+col_labels = ['volume',"surface area","sphericity","real_count","asm","contrast","cor","sos:v","idm","sav","sva","sen","dva","den","imcI","imcII","mcc"]
+# row_labels = ['Row A', 'Row B', 'Row C']
+
+fig4 = plt.figure()
+ax100 = fig4.add_subplot()
+
+ax100.axis('off')
+table = ax100.table(cellText=cell_text, cellColours=colors,cellLoc='center', loc='center',colLabels=col_labels,rowLabels=col_labels)
+
+table.auto_set_font_size(False)
+table.set_fontsize(5)
+
 
 hdbscan = cluster.HDBSCAN(min_cluster_size=2)
 hdbscan.fit(x_pca)
@@ -224,60 +279,33 @@ ax5.set_xlabel('pc1')
 ax5.set_ylabel('pc2')
 ax5.set_title('HDBSCAN after PCA')
 for i, (x, y_val) in enumerate(x_pca):
-    if 0<=i<=4:
-        ax5.annotate(str(i+1), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 5<=i<=9:
-        ax5.annotate(str(i+3), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 10<=i<=15:
-        ax5.annotate(str(i+4), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 16<=i:
-        ax5.annotate(str(i+16), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+    ax5.annotate(filenames[i], (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
 
 
 
+# tsne = manifold.TSNE(2,random_state=0)
+# tsne_result = tsne.fit_transform(x_train_scaled)
+# print(tsne_result.shape)
 
-tsne = manifold.TSNE(2,random_state=0)
-tsne_result = tsne.fit_transform(x_train_scaled)
-print(tsne_result.shape)
+# print(f"tsne effective learnign rate: {tsne.learning_rate_}")
 
-print(f"tsne effective learnign rate: {tsne.learning_rate_}")
+# ax3.scatter(tsne_result[:, 0], tsne_result[:, 1])
+# ax3.set_xlabel('tsne1')
+# ax3.set_ylabel('tsne2')
+# ax3.set_title("t-SNE embedding")
+# for i, (x, y_val) in enumerate(tsne_result):
+#     ax3.annotate(filenames[i], (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
 
-kmeans1 = cluster.KMeans(n_clusters=6,random_state=0)
-kmeans1.fit(tsne_result)
-labels1 = kmeans1.labels_
-centers1 = kmeans1.cluster_centers_
+# umap = umap.UMAP(random_state=0)
+# umap_result = umap.fit_transform(x_train_scaled)
 
-ax3.scatter(tsne_result[:, 0], tsne_result[:, 1])
-ax3.set_xlabel('tsne1')
-ax3.set_ylabel('tsne2')
-ax3.set_title("t-SNE embedding")
-for i, (x, y_val) in enumerate(tsne_result):
-    if 0<=i<=4:
-        ax3.annotate(str(i+1), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 5<=i<=9:
-        ax3.annotate(str(i+3), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 10<=i<=15:
-        ax3.annotate(str(i+4), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 16<=i:
-        ax3.annotate(str(i+16), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-
-umap = umap.UMAP(random_state=0)
-umap_result = umap.fit_transform(x_train_scaled)
-
-print(umap_result.shape)
-ax4.scatter(umap_result[:, 0], umap_result[:, 1])
-ax4.set_xlabel('umap1')
-ax4.set_ylabel('umap2')
-ax4.set_title("UMAP embedding")
-for i, (x, y_val) in enumerate(umap_result):
-    if 0<=i<=4:
-        ax4.annotate(str(i+1), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 5<=i<=9:
-        ax4.annotate(str(i+3), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 10<=i<=15:
-        ax4.annotate(str(i+4), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
-    elif 16<=i:
-        ax4.annotate(str(i+16), (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
+# print(umap_result.shape)
+# ax4.scatter(umap_result[:, 0], umap_result[:, 1])
+# ax4.set_xlabel('umap1')
+# ax4.set_ylabel('umap2')
+# ax4.set_title("UMAP embedding")
+# for i, (x, y_val) in enumerate(umap_result):
+#     ax4.annotate(filenames[i], (x, y_val), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=8)
 
 
 
