@@ -1,6 +1,6 @@
 import os
 import napari
-from scipy import stats, signal
+from scipy import stats, signal, cluster
 from scipy.spatial import ConvexHull, convex_hull_plot_2d
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,14 +9,19 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy import ndimage as ndi
 from skimage import (exposure, feature, filters, io, measure,
-                     morphology, restoration, segmentation, transform,
+                     morphology, restoration, draw, segmentation, transform,
                      util)
 import math
 from pathlib import Path
+from sklearn import metrics
 
-file = io.imread("/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_3/041.tif")
+file = io.imread("/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_3/051.tif")
 
 viewer = napari.view_image(file, visible=False)
+
+# sphere = draw.ellipsoid(50,50,50)
+
+# viewer.add_image(sphere)
 
 # hole_fill = np.zeros_like(file)
 # viewer.add_image(file[5,:,:])
@@ -28,7 +33,7 @@ shape = file.shape
 def counting(file,final_count):
     labels = measure.label(file,connectivity=1)
     # viewer.add_image(file)
-    viewer.add_labels(labels)
+    # viewer.add_labels(labels)
     lobes = measure.regionprops_table(labels,properties=('area','area_filled',))
     lobe_areas = lobes['area']
     filtered_lobes = lobe_areas[lobe_areas>80000]
@@ -59,30 +64,66 @@ def close(x):
         newfile[i,:,:] = new
     return newfile
 
-def count_lobes(file, count,final_blobs): # doesn't take into account anything w/ an area limit
+        
+def count_comp(file,depth,id,ids): # linkage = n-1, 4
+    # ID IS ID OF PARENT, TUPLE OF (DEPTH, CODE)
     eroded_file = morphology.binary_erosion(file,footprint=np.ones(shape=(3,12,12))) # change footprint to correspond to resolution?
     labels,labelcount = measure.label(eroded_file,connectivity=1,return_num=True)
     # print("labels {}, labelcount {}".format(labels, labelcount))
+    print(f"depth:{depth}, id: {id}")
     if labelcount>0:
-        current_lobe_count=0
         for i in range(1,labelcount+1):
             new = np.where(labels==i,labels,0)
-            current_lobe_count+= count_lobes(new,0,final_blobs)
+            newcode = id[1] + chr(i+96)
+            count_comp(new,depth+1,(depth+1,newcode),ids)
+            viewer.add_image(new,name=f"{depth} level blob")
+    else: # labelcount==0:
+        print("count f adding??????")
+        ids.append(id)
+        # viewer.add_image(file,name=f"{depth} level blob (final depth)",visible=False)
+        # return count + 1
+
+def count_lobes(file, count,final_blobs): # doesn't take into account anything w/ an area limit
+    eroded_file = morphology.binary_erosion(file,footprint=np.ones(shape=(3,12,12))) # change footprint to correspond to resolution?
+    labels,labelcount = measure.label(eroded_file,connectivity=1,return_num=True)
+    regionprops = measure.regionprops(labels)
+    viewer.add_image(eroded_file,visible=False)
+
+    # print("labels {}, labelcount {}".format(labels, labelcount))
+    if labelcount>0:
+        current_lobe_count=0
+        skip = []
+        i=1
+        for regioni in regionprops:
+            if i in skip:
+                i+=1
+                continue
+            else:
+                j=1
+                for regionj in regionprops:
+                    regionicentroid = np.array(regioni.centroid).reshape((1,3))
+                    regionjcentroid = np.array(regionj.centroid).reshape((1,3))
+                    if 0<np.linalg.norm(regionicentroid-regionjcentroid)<50:
+                        skip.append(j)
+                    j+=1
+                new = np.where(labels==i,labels,0)
+                current_lobe_count+= count_lobes(new,0,final_blobs)
+                i+=1
         return count + current_lobe_count
     elif labelcount==0:
         # print("count f adding??????")
         viewer.add_image(file,name="blob before final erosion",visible=False)
         np.logical_or(final_blobs,file,out=final_blobs)
-        if np.count_nonzero(file)<100:
-            return count
-        else:
-            return count + 1
+        return count+1 # i think now that i have the condition to check for thingies close to each other that this should always be count+1?
+        # if np.count_nonzero(file)<100:
+        #     return count
+        # else:
+        #     return count + 1
     else:
         count_lobes(file,count)
     print("this should never happen")
     return count_lobes(eroded_file,count)
         
-
 # closing = morphology.binary_dilation(file)
 # closing = morphology.binary_dilation(closing)
 
@@ -97,7 +138,7 @@ def count_lobes(file, count,final_blobs): # doesn't take into account anything w
 # filtered_hole_areas = hole_areas[hole_areas>200]
 # print(f"final hole count: {filtered_hole_areas.size}")
 
-directory_path = Path('/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_3')
+directory_path = Path('/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_3/LobeTest')
 dir = [f.path for f in os.scandir(directory_path) if f.is_file()]
 all_files = []
 for path in dir:
@@ -109,88 +150,115 @@ all_files = sorted(all_files)
 
 lobe_counts = []
 adj_counts = []
-for path in all_files:
-    ogfile = io.imread(path)
-    print(path)
+filenames = []
+
+for i in range(len(all_files)):
+    fileindex = str(all_files[i][-6]+all_files[i][-5])
+    filenames.append(fileindex)
+    ogfile = io.imread(all_files[i])
+    print(all_files[i])
     hole_fill = fill(ogfile)
     viewer.add_image(hole_fill,visible=False)
     arr = morphology.remove_small_objects(hole_fill,min_size=500,connectivity=1)
     final_blobs = np.zeros_like(hole_fill)
     count = -1
+
+    ids = []
+    total_count = count_comp(arr,0,(0,"a"),ids)
+    print(ids)
+    finalcodes = [id[1] for id in ids]
+    print(finalcodes)
+
+    '''
     total_lobe_count = count_lobes(arr,0,final_blobs)
     print(total_lobe_count)
     print(f"nonzero of final blobs: {np.count_nonzero(final_blobs)}")
-    viewer.add_image(final_blobs)
+    viewer.add_image(final_blobs,visible=False)
     lobe_counts = np.append(lobe_counts,total_lobe_count)
+    '''
 
-    final_blob_labels = measure.label(final_blobs)
-    centroids = []
-    data = measure.regionprops(final_blob_labels)
-    diff_label_count = len(data)
-    overlaps = 0
-    for region in data:
-        print(region.centroid)
-        print(region.area)
-        centroids = np.append(centroids, np.array(region.centroid).reshape((1,3)))
-    print(f"diff label count og: {diff_label_count}")
-    # print(len(centroids))
-    centroids= np.reshape(centroids,(len(data),3))
-    # print(len(centroids))
-    # print(centroids)
+    # final_blob_labels = measure.label(final_blobs)
+    # centroids = []
+    # data = measure.regionprops(final_blob_labels)
+    # diff_label_count = len(data)
+    # overlaps = 0
+    # for region in data:
+    #     print(region.centroid)
+    #     print(region.area)
+    #     centroids = np.append(centroids, np.array(region.centroid).reshape((1,3)))
+    # print(f"diff label count og: {diff_label_count}")
+    # # print(len(centroids))
+    # centroids= np.reshape(centroids,(len(data),3))
+    # # print(len(centroids))
+    # # print(centroids)
+    # # for i in range(len(centroids)):
+    # #     for j in range(i+1,len(centroids)):
+    # #         print(f"dist between centroid {i} and {j}: {np.linalg.norm(centroids[i]-centroids[j])}")
+    # #         if 0<np.linalg.norm(centroids[i]-centroids[j])<50:
+    # #             overlaps+=1
+    # cycle_count = 0
+
+    # skip = []
+    # # WIP cycle counting...please...so easy...
     # for i in range(len(centroids)):
-    #     for j in range(i+1,len(centroids)):
-    #         print(f"dist between centroid {i} and {j}: {np.linalg.norm(centroids[i]-centroids[j])}")
-    #         if 0<np.linalg.norm(centroids[i]-centroids[j])<50:
-    #             overlaps+=1
-    cycle_count = 0
+    #     if i in skip:
+    #         continue
+    #     # else:
+    #         # check if this is a cycle?
+    #         # is there a cycle at i 
 
-    skip = []
-    # WIP cycle counting...please...so easy...
-    for i in range(len(centroids)):
-        if i in skip:
-            continue
-        # else:
-            # check if this is a cycle?
-            # is there a cycle at i 
-
-    # scuffed cycle counting that doesn't work
-    for i in range(len(centroids)):
-        if i in skip:
-            # don't check this one ??
-            continue
-        else:
-            # check if a node is less than X voxels away
-            close_nodes = []
-            for j in range(i,len(centroids)):
-                if 0<np.linalg.norm(centroids[i]-centroids[j])<50:
-                    # this node is close
-                    close_nodes = np.append(close_nodes,j)
-                    overlaps+=1
-            skip = np.append(skip,close_nodes)
-    diff_label_count = diff_label_count-overlaps
-    adj_counts = np.append(adj_counts,diff_label_count)
+    # # scuffed cycle counting that doesn't work
+    # for i in range(len(centroids)):
+    #     if i in skip:
+    #         # don't check this one ??
+    #         continue
+    #     else:
+    #         # check if a node is less than X voxels away
+    #         close_nodes = []
+    #         for j in range(i,len(centroids)):
+    #             if 0<np.linalg.norm(centroids[i]-centroids[j])<50:
+    #                 # this node is close
+    #                 close_nodes = np.append(close_nodes,j)
+    #                 overlaps+=1
+    #         skip = np.append(skip,close_nodes)
+    # diff_label_count = diff_label_count-overlaps
+    # adj_counts = np.append(adj_counts,diff_label_count)
 
 
 print(lobe_counts)
-print(adj_counts)
-real_counts = [2,3,4,2,4,3,1,3,2,3,3,2,1,2,3,2,1,3,3,3]
-correct = 0
-for i in range(len(real_counts)):
-    if lobe_counts[i]==real_counts[i]:
-        correct+=1
-    else:
-        print(f"this {i} is wrong, calculated count: {lobe_counts[i]}, real count: {real_counts[i]}")
+# print(adj_counts)
+real_counts = [2,2,4,4,4,4,2,1,3,4,2,1,4,1,3,4,3,3,3,3,3,3,2,3,2,2,3,4,2,4,3,1,3,2,3,3,2,1,2,3,2,1,3,3,3]
+real_counts = [2]
+print(metrics.accuracy_score(real_counts,lobe_counts))
 
-print(f"{correct}/{len(real_counts)}")
-correct =0
-for i in range(len(adj_counts)):
-    if adj_counts[i]==real_counts[i]:
-        correct+=1
-    else:
-        print(f"this {i} is wrong, calculated count: {adj_counts[i]}, real count: {real_counts[i]}")
+# correct = 0
+# for i in range(len(real_counts)):
+#     if lobe_counts[i]==real_counts[i]:
+#         correct+=1
+#     else:
+#         print(f"this {i} is wrong, calculated count: {lobe_counts[i]}, real count: {real_counts[i]}")
 
-print(f"{correct}/{len(adj_counts)}")
+# print(f"{correct}/{len(real_counts)}")
+# correct =0
+# for i in range(len(adj_counts)):
+#     if adj_counts[i]==real_counts[i]:
+#         correct+=1
+#     else:
+#         print(f"this {i} is wrong, calculated count: {adj_counts[i]}, real count: {real_counts[i]}")
 
+# print(f"{correct}/{len(adj_counts)}")
+
+
+
+
+# print(count_lobes(sphere,0,np.zeros_like(sphere)))
+# ellip_double = np.concatenate((sphere[:,:-1, ...], sphere[:,2:, ...]), axis=1)
+# ellip_triple = np.concatenate((ellip_double[:,:-1, ...], sphere[:,2:, ...]), axis=1)
+# print(count_lobes(ellip_double,0,np.zeros_like(ellip_double)))
+# print(count_lobes(ellip_triple,0,np.zeros_like(ellip_triple)))
+
+# viewer.add_image(ellip_triple)
+# viewer.add_image(ellip_double)
 napari.run()
 
 # beginning of image processing section
