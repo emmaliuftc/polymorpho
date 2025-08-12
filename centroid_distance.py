@@ -1,16 +1,23 @@
+import os
 import napari
 from scipy import stats, signal
-from scipy.spatial import ConvexHull, convex_hull_plot_2d
+# from scipy.spatial import ConvexHull, convex_hull_plot_2d
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
-from matplotlib import pyplot as plt
-from scipy import ndimage as ndi
+from matplotlib import pyplot as plt, colors, cm
+# from scipy import ndimage as ndi
 from skimage import (exposure, feature, filters, io, measure,
                      morphology, restoration, segmentation, transform,
                      util)
 from pathlib import Path
+import math
+# import pywt
+from sklearn import svm,preprocessing,cluster,decomposition,metrics,manifold,model_selection
+import mahotas
+# import seaborn as sns
+# import umap
 
 def fill(x):
     newfile = np.zeros_like(x)
@@ -28,21 +35,24 @@ viewer = napari.view_image(file,visible=False)
 # print(file.shape)
 shape = file.shape
 
+counted_lobes = []
 
 
-directory_path = Path('/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_2')
-all_files = list(directory_path.glob('*'))
+directory_path = Path('/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Preprocessing_3')
+dir = [f.path for f in os.scandir(directory_path) if f.is_file()]
+all_files = []
+for path in dir:
+    all_files = np.append(all_files,str(path))
 
-# for path in all_files:
-#     ogfile = io.imread(path)
-#     print(path)
-#     viewer.add_image(ogfile,visible=False)
-# napari.run()
+all_files = sorted(all_files)
+filenames= []
+signals = []
 
-for path in all_files:
-    ogfile = io.imread(path)
-    print(path)
-    # viewer.add_image(ogfile)
+for i in range(len(all_files)):
+    fileindex = str(all_files[i][-6]+all_files[i][-5])
+    filenames.append(fileindex)
+    ogfile = io.imread(all_files[i])
+    print(all_files[i])
     hole_fill = fill(ogfile)
 
     step = 3
@@ -111,7 +121,17 @@ for path in all_files:
         else:
             max_dist[row2_value] = row1_value
 
-    result = list(max_dist.values())
+    result = list(max_dist.values()) # y-values
+    xvalues = range(len(result))
+
+    x=np.empty(shape=650)
+    for i in range(650):
+        x[i] = i*(len(result)/650)
+
+    final = np.interp(x=x,xp=xvalues,fp=result)
+    # print(final)
+    signals.append(final)
+    print(len(final))
 
     uniquetheta = np.unique(distance[1])[-100:]
     uniquetheta = np.append(uniquetheta,np.unique(distance[1]))
@@ -121,11 +141,15 @@ for path in all_files:
     newresult = np.append(newresult,result)
     newresult = np.append(newresult,result[:100])
 
-
-    #plt.scatter(result,np.unique(distance[1]),alpha=0.2)
-    plt.scatter(uniquetheta,newresult,alpha=0.1,color="red")
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot()
+    ax1.scatter(result,range(len(result)),alpha=0.2)
+    ax1.scatter(final,x,alpha=0.2,color="red")
     plt.xlabel("Distance to centroid")
     plt.ylabel("theta in radians")
+    # plt.show()
+    plt.close()
+
 
     widthmin = 25
     prominencemin = 15
@@ -136,18 +160,20 @@ for path in all_files:
     # print(len(result))
 
     newpeaks,newproperties = signal.find_peaks(newresult,width=widthmin,prominence=prominencemin,height=heightmin)
-    print(newpeaks)
+    # print(newpeaks)
     newpeaks = newpeaks-100
     newpeaks = newpeaks%len(result)
     if len(np.unique(newpeaks))==0:
         print(f"lobe count: {len(np.unique(newpeaks))+1}")
+        counted_lobes.append(len(np.unique(newpeaks))+1)
     else: 
         print(f"lobe count: {len(np.unique(newpeaks))}")
+        counted_lobes.append(len(np.unique(newpeaks)))
 
     # print(properties)
-    print(newproperties)
-    print(properties["prominences"].max())
-    plt.plot(uniquetheta[newpeaks],newresult[newpeaks],'x')
+    # print(newproperties)
+    # print(properties["prominences"].max())
+    # plt.plot(uniquetheta[newpeaks],newresult[newpeaks],'x')
 
     # plt.scatter(distance[0],distance[2],alpha=0.2)
     # print(f"v:{verts},f:{faces},n:{normals},v:{values}")
@@ -193,9 +219,6 @@ for path in all_files:
         ax.plot(verts[hull.vertices[i]][0],verts[hull.vertices[i]][1],verts[hull.vertices[i]][2],'o')
     '''
 
-    plt.tight_layout()
-    plt.show()
-
     # DISPLAY MESH
     # import napari
     # from skimage import io
@@ -209,3 +232,30 @@ for path in all_files:
     # surface = (verts, faces, values)
 
     # viewer = napari.view_surface(surface)
+
+real_counts = [2,2,4,4,4,4,2,1,3,4,2,1,4,1,3,4,3,3,3,3,3,3,2,3,2,2,3,4,2,4,3,1,3,2,3,3,2,1,2,3,2,1,3,3,3]
+
+x_train = np.array(signals)
+print(x_train.shape)
+
+norm = preprocessing.Normalizer().fit(x_train)
+x_train_norm = norm.transform(x_train)
+
+clf = svm.SVC(kernel="linear")
+scores = model_selection.cross_val_score(clf,x_train_norm,real_counts,cv=5)
+print(scores)
+
+print("lobe counts %0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
+
+clf = svm.SVC(kernel="linear")
+
+x_train, x_test, y_train, y_test = model_selection.train_test_split(x_train_norm,real_counts,test_size=0.3,random_state=1)
+
+clf.fit(x_train,y_train)
+
+y_pred = clf.predict(x_test)
+print(y_pred)
+
+print(metrics.accuracy_score(y_test,y_pred))
+
+print(metrics.accuracy_score(real_counts,counted_lobes))
