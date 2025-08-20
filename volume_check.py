@@ -24,6 +24,8 @@ def fill(x):
 directory_path = Path('/Users/coding/Downloads/_nuclear_morpho_data/Lamin/Test')
 all_files = list(directory_path.glob('*'))
 
+viewer = napari.view_image(io.imread(all_files[0]),visible=False)
+
 volumes = []
 testvolumes = []
 for path in all_files:
@@ -44,3 +46,4 @@ plt.ylabel("count")
 plt.tight_layout()
 plt.show()
 
+napari.run()
