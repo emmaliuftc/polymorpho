@@ -1,4 +1,4 @@
-# polymorpho-lee-lab
+# polymorpho-tools
 Analysis codes for quantifying polymorphonuclear nuclear shape transitions
 
 ## Code Summary
