@@ -1,4 +1,4 @@
-# polymorpho-tools
+# Polymorpho-tools
 Analysis codes for quantifying polymorphonuclear nuclear shape transitions
 
 ## Code Summary
