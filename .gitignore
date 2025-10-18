@@ -1,0 +1,8 @@
+# Ignore image files
+*.tif
+*.png
+
+.RData
+.RHistory
+
+data/
