@@ -1,9 +1,5 @@
 # Polymorpho-tools
-Analysis codes for quantifying polymorphonuclear nuclear shape transitions
-
-## Code Summary
-
-This repository contains a collection of Python scripts for analyzing 3D microscopy images of cell nuclei, with a focus on quantifying nuclear lobes and classifying nuclear morphology.
+Analysis codes for quantifying polymorphonuclear shape transitions in 3D microscopy images. Focuses on quantifying nuclear lobes and classifying nuclear morphology.
 
 ### Core Analysis
 
@@ -19,14 +15,14 @@ This repository contains a collection of Python scripts for analyzing 3D microsc
 
 ### Experimental and Utility Scripts
 
-*   **`scikit_test.py`**: An experimental script for exploring different recursive erosion strategies to count nuclear components. It contains several approaches and a significant amount of commented-out code, suggesting it was used as a scratchpad for developing the methods in `hierarchical.py`.
+*   **`scikit_test.py`**: An experimental script for exploring different recursive erosion strategies to count nuclear components. Sratchpad for developing the methods in `hierarchical.py`.
 
 *   **`downsampling_test.py`**: Analyzes the effect of image quantization (reducing the number of gray levels) on feature extraction. It compares different quantization strategies (K-Means vs. uniform) and measures the impact on Mean Squared Error (MSE) and the time taken to compute Haralick features.
 
-*   **`2D_test.py`**: An exploratory script for applying lobe counting algorithms to 2D images, likely from Geimsa-stained samples. It contains functions for iterative erosion and counting in a 2D context.
+*   **`2D_test.py`**: An exploratory script for applying lobe counting algorithms to 2D images from Geimsa-stained samples. It contains functions for iterative erosion and counting in a 2D context.
 
 *   **`zernike.py`**: A focused script for experimenting with the extraction of Zernike moments from different 2D slices of the 3D nucleus.
 
 *   **`volume_check.py`**: A utility script to calculate and visualize the distribution of nuclear volumes across a dataset of images.
 
-*   **`import_torch.py`**: A basic script for setting up and testing a PyTorch environment. It demonstrates loading a pre-trained ResNet model and working with the CIFAR-10 dataset, likely for future deep learning applications.
+*   **`import_torch.py`**: A basic script for setting up and testing a PyTorch environment. It demonstrates loading a pre-trained ResNet model and working with the CIFAR-10 dataset,for future deep learning applications.
