@@ -26,3 +26,16 @@ Analysis codes for quantifying polymorphonuclear shape transitions in 3D microsc
 *   **`volume_check.py`**: A utility script to calculate and visualize the distribution of nuclear volumes across a dataset of images.
 
 *   **`import_torch.py`**: A basic script for setting up and testing a PyTorch environment. It demonstrates loading a pre-trained ResNet model and working with the CIFAR-10 dataset,for future deep learning applications.
+
+### Installation and running the scripts 
+
+*   Create a virtual environment
+*   Install pytorch
+    *   pip3 install torch torchvision
+*   Install napari 
+    *   pip3 install "napari[all]"
+
+*   Most of the scripts are self-explainatory, and you can start them from with
+    vs-code or your own IDE.
+
+*   Path name might have to be updated for the right location of image file
