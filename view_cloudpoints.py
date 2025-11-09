@@ -3,7 +3,7 @@ import numpy as np
 
 # --- Replace this with the path to your file ---
 
-file_path = '/home/coding/_nuclear_morpho_data/Lamin/Preprocessing_3_sdf/001.npy'
+file_path = '/home/coding/_nuclear_morpho_data/Lamin/Preprocessing_3_sdf/002.npy'
 
 # 1. Load the .npy file into a NumPy array
 # This assumes the file contains an array of shape (N, 3) for N points.
