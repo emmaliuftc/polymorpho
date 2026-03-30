@@ -39,3 +39,10 @@ Analysis codes for quantifying polymorphonuclear shape transitions in 3D microsc
     vs-code or your own IDE.
 
 *   Path name might have to be updated for the right location of image file
+
+### Doc
+
+* doc/paperlog.pdf is with scanned workload on paper 
+
+* doc/worklog.pdf is with digital workload from 5/28/2026 to 10/26/2026 
+
